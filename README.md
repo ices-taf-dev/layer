@@ -187,3 +187,67 @@ checked by the SOFIA package.
 To summarize, the ICES-specific 'access' in the core TAF package is a very minor
 issue, but as a thought exercise it highlights interesting technicalities and
 emerging issues that come with the icesTAF-as-thin-layer-on-top-of-TAF design.
+
+---
+
+## Second Look at Imports
+
+One question is whether **icesTAF** can import and export functions from the
+**TAF** package. For example, there is some benefit of providing
+`icesTAF:mkdir`. (To clarify, is the main benefit to support existing scripts
+that may have used namespace calls like this?)
+
+An existing analogous example is how **devtools** tunnels into **remotes** and
+provides `devtools::install_github`. Before the **devtools** package was split,
+this call had been written like this in many scripts, people had memorized it,
+and it is found in various R tutorials and textbooks.
+
+### Experiments
+
+A simple experimental approach is to try different things and see (1) if a build
+check raises notes/warnings, (2) if `icesTAF::mkdir` works, (3) what `?mkdir`
+does, and (4) if there are any startup messages when calling `library(icesTAF)`.
+
+**Experiment 1** *- icesTAF-import.R to import everything and export everything*
+
+File               | Entry            | Notes
+------------------ | ---------------- | ------------------
+`DESCRIPTION`      | `Imports: TAF`   |
+`icesTAF-import.R` | `@import TAF`    |
+`icesTAF-import.R` | `@aliases mkdir` | for every function
+`icesTAF-import.R` | `@export mkdir`  | for every function
+
+https://github.com/ices-taf-dev/icesTAF/tree/import
+
+Results from this experiment:
+
+1. Builds without notes or warnings
+2. `icesTAF::mkdir` works
+3. `?mkdir` brings up a nuisance pre-help page, asking the user to choose
+   between two help pages
+4. `library(icesTAF)` runs without startup messages
+
+### The devtools approach
+
+The **devtools** approach to tunnel into **remotes** to provide
+`devtools::install_github` can be seen in the `remotes.R` file:
+
+```
+#' @importFrom remotes install_github
+#' @rdname remote-reexports
+#' @export
+install_github <- with_pkgbuild_build_tools(with_ellipsis(remotes::install_github))
+```
+
+https://github.com/r-lib/devtools/blob/v2.4.3/R/remotes.R#L63-L66
+
+This seems to give a similar result as Experiment 1 above, bringing up a
+nuisance pre-help page that asks the user to choose between two help pages.
+
+### Depends vs. Imports
+
+Comparison     | Depends             | Imports
+-------------- | ------------------- | ------------------------------------------------------------------------------------------
+Maintenance    | None                | [icesTAF-import.R](https://github.com/ices-taf-dev/icesTAF/blob/import/R/icesTAF-import.R)
+Help pages     | Instant             | nuisance pre-help page for every function
+icesTAF::mkdir | No, only TAF::mkdir | Yes, both icesTAF::mkdir and TAF::mkdir
